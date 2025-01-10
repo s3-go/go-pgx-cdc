@@ -5,6 +5,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	cdc "github.com/s3-go/go-pgx-cdc"
 	"github.com/s3-go/go-pgx-cdc/config"
+	"github.com/s3-go/go-pgx-cdc/pq"
 	"github.com/s3-go/go-pgx-cdc/pq/message/format"
 	"github.com/s3-go/go-pgx-cdc/pq/replication"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,11 @@ var _ replication.Listeners = (*listenersContainerTransactional)(nil)
 
 type listenersContainerTransactional struct {
 	messageCh chan any
+}
+
+func (l *listenersContainerTransactional) SendLSNHookFunc() replication.SendLSNHookFunc {
+	return func(pq.LSN) {
+	}
 }
 
 func (l *listenersContainerTransactional) ListenerFunc() replication.ListenerFunc {
