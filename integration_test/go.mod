@@ -5,10 +5,10 @@ go 1.22.4
 replace github.com/s3-go/go-pgx-cdc => ../
 
 require (
-	github.com/s3-go/go-pgx-cdc v0.0.0-00010101000000-000000000000
 	github.com/go-playground/errors v3.3.0+incompatible
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/jackc/pgx/v5 v5.6.0
+	github.com/s3-go/go-pgx-cdc v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.31.0
 )

@@ -9,6 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-playground/errors"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/s3-go/go-pgx-cdc/config"
 	"github.com/s3-go/go-pgx-cdc/internal/metric"
 	"github.com/s3-go/go-pgx-cdc/internal/slice"
@@ -16,9 +19,6 @@ import (
 	"github.com/s3-go/go-pgx-cdc/pq"
 	"github.com/s3-go/go-pgx-cdc/pq/message"
 	"github.com/s3-go/go-pgx-cdc/pq/message/format"
-	"github.com/go-playground/errors"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgproto3"
 )
 
 var (
@@ -35,6 +35,12 @@ type ListenerContext struct {
 }
 
 type ListenerFunc func(ctx *ListenerContext)
+type SinkHookFunc func(xLogData *XLogData)
+
+type Listeners interface {
+	ListenerFunc() ListenerFunc
+	SinkHookFunc() SinkHookFunc
+}
 
 type Message struct {
 	message  any
@@ -55,6 +61,7 @@ type stream struct {
 	relation     map[uint32]*format.Relation
 	messageCH    chan *Message
 	listenerFunc ListenerFunc
+	sinkHookFunc SinkHookFunc
 	sinkEnd      chan struct{}
 	mu           *sync.RWMutex
 	config       config.Config
@@ -62,7 +69,7 @@ type stream struct {
 	closed       atomic.Bool
 }
 
-func NewStream(conn pq.Connection, cfg config.Config, m metric.Metric, system *pq.IdentifySystemResult, listenerFunc ListenerFunc) Streamer {
+func NewStream(conn pq.Connection, cfg config.Config, m metric.Metric, system *pq.IdentifySystemResult, listeners Listeners) Streamer {
 	return &stream{
 		conn:         conn,
 		metric:       m,
@@ -70,7 +77,8 @@ func NewStream(conn pq.Connection, cfg config.Config, m metric.Metric, system *p
 		config:       cfg,
 		relation:     make(map[uint32]*format.Relation),
 		messageCH:    make(chan *Message, 1000),
-		listenerFunc: listenerFunc,
+		listenerFunc: listeners.ListenerFunc(),
+		sinkHookFunc: listeners.SinkHookFunc(),
 		lastXLogPos:  10,
 		sinkEnd:      make(chan struct{}, 1),
 		mu:           &sync.RWMutex{},
@@ -161,6 +169,7 @@ func (s *stream) sink(ctx context.Context) {
 				logger.Error("parse xLog data", "error", err)
 				continue
 			}
+			s.sinkHookFunc(&xld)
 
 			logger.Debug("wal received", "walData", string(xld.WALData), "walDataByte", slice.ConvertToInt(xld.WALData), "walStart", xld.WALStart, "walEnd", xld.ServerWALEnd, "serverTime", xld.ServerTime)
 
