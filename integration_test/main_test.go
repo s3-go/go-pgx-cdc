@@ -3,11 +3,11 @@ package integration
 import (
 	"context"
 	"fmt"
-	"github.com/s3-go/go-pgx-cdc/config"
-	"github.com/s3-go/go-pgx-cdc/pq"
 	"github.com/go-playground/errors"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/s3-go/go-pgx-cdc/config"
+	"github.com/s3-go/go-pgx-cdc/pq"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"io"

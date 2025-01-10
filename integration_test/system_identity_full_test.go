@@ -12,6 +12,27 @@ import (
 	"time"
 )
 
+var _ replication.Listeners = (*listenersContainerReplica)(nil)
+
+type listenersContainerReplica struct {
+	messageCh chan any
+}
+
+func (l *listenersContainerReplica) ListenerFunc() replication.ListenerFunc {
+	return func(ctx *replication.ListenerContext) {
+		switch msg := ctx.Message.(type) {
+		case *format.Insert, *format.Delete, *format.Update:
+			l.messageCh <- msg
+		}
+		_ = ctx.Ack()
+	}
+}
+
+func (l *listenersContainerReplica) SinkHookFunc() replication.SinkHookFunc {
+	return func(xLogData *replication.XLogData) {
+	}
+}
+
 func TestReplicaIdentityDefault(t *testing.T) {
 	ctx := context.Background()
 
@@ -29,15 +50,11 @@ func TestReplicaIdentityDefault(t *testing.T) {
 	}
 
 	messageCh := make(chan any, 500)
-	handlerFunc := func(ctx *replication.ListenerContext) {
-		switch msg := ctx.Message.(type) {
-		case *format.Insert, *format.Delete, *format.Update:
-			messageCh <- msg
-		}
-		_ = ctx.Ack()
+	lc := &listenersContainerReplica{
+		messageCh: messageCh,
 	}
 
-	connector, err := cdc.NewConnector(ctx, cdcCfg, handlerFunc)
+	connector, err := cdc.NewConnector(ctx, cdcCfg, lc)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
@@ -63,7 +80,7 @@ func TestReplicaIdentityDefault(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
-		for range 10 {
+		for i := 0; i < 10; i++ {
 			<-messageCh
 		}
 
@@ -75,7 +92,7 @@ func TestReplicaIdentityDefault(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
-		for i := range 5 {
+		for i := 0; i < 5; i++ {
 			m := <-messageCh
 			assert.Equal(t, booksNew[i].Map(), m.(*format.Update).NewDecoded)
 			assert.Nil(t, m.(*format.Update).OldDecoded["id"])
@@ -100,15 +117,11 @@ func TestReplicaIdentityFull(t *testing.T) {
 	}
 
 	messageCh := make(chan any, 500)
-	handlerFunc := func(ctx *replication.ListenerContext) {
-		switch msg := ctx.Message.(type) {
-		case *format.Insert, *format.Delete, *format.Update:
-			messageCh <- msg
-		}
-		_ = ctx.Ack()
+	lc := &listenersContainerReplica{
+		messageCh: messageCh,
 	}
 
-	connector, err := cdc.NewConnector(ctx, cdcCfg, handlerFunc)
+	connector, err := cdc.NewConnector(ctx, cdcCfg, lc)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
@@ -134,7 +147,7 @@ func TestReplicaIdentityFull(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
-		for range 10 {
+		for i := 0; i < 10; i++ {
 			<-messageCh
 		}
 
@@ -146,7 +159,7 @@ func TestReplicaIdentityFull(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
-		for i := range 5 {
+		for i := 0; i < 5; i++ {
 			m := <-messageCh
 			assert.Equal(t, booksNew[i].Map(), m.(*format.Update).NewDecoded)
 			assert.Equal(t, books[i].Map(), m.(*format.Update).OldDecoded)

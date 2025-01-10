@@ -2,15 +2,36 @@ package integration
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5/pgxpool"
 	cdc "github.com/s3-go/go-pgx-cdc"
 	"github.com/s3-go/go-pgx-cdc/config"
 	"github.com/s3-go/go-pgx-cdc/pq/message/format"
 	"github.com/s3-go/go-pgx-cdc/pq/replication"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
+
+var _ replication.Listeners = (*listenersContainerTransactional)(nil)
+
+type listenersContainerTransactional struct {
+	messageCh chan any
+}
+
+func (l *listenersContainerTransactional) ListenerFunc() replication.ListenerFunc {
+	return func(ctx *replication.ListenerContext) {
+		switch msg := ctx.Message.(type) {
+		case *format.Insert, *format.Delete, *format.Update:
+			l.messageCh <- msg
+		}
+		_ = ctx.Ack()
+	}
+}
+
+func (l *listenersContainerTransactional) SinkHookFunc() replication.SinkHookFunc {
+	return func(xLogData *replication.XLogData) {
+	}
+}
 
 func TestTransactionalProcess(t *testing.T) {
 	ctx := context.Background()
@@ -28,15 +49,11 @@ func TestTransactionalProcess(t *testing.T) {
 	}
 
 	messageCh := make(chan any, 500)
-	handlerFunc := func(ctx *replication.ListenerContext) {
-		switch msg := ctx.Message.(type) {
-		case *format.Insert, *format.Delete, *format.Update:
-			messageCh <- msg
-		}
-		_ = ctx.Ack()
+	lc := &listenersContainerTransactional{
+		messageCh: messageCh,
 	}
 
-	connector, err := cdc.NewConnector(ctx, cdcCfg, handlerFunc)
+	connector, err := cdc.NewConnector(ctx, cdcCfg, lc)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
