@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	cdc "github.com/s3-go/go-pgx-cdc"
 	"github.com/s3-go/go-pgx-cdc/config"
+	"github.com/s3-go/go-pgx-cdc/pq"
 	"github.com/s3-go/go-pgx-cdc/pq/message/format"
 	"github.com/s3-go/go-pgx-cdc/pq/replication"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,11 @@ func (l *listenersContainerCopy) ListenerFunc() replication.ListenerFunc {
 			l.totalCounter.Add(1)
 			l.messageCh <- ctx
 		}
+	}
+}
+
+func (l *listenersContainerCopy) SendLSNHookFunc() replication.SendLSNHookFunc {
+	return func(pq.LSN) {
 	}
 }
 

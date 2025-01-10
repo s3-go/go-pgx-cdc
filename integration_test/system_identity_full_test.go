@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	cdc "github.com/s3-go/go-pgx-cdc"
+	"github.com/s3-go/go-pgx-cdc/pq"
 	"github.com/s3-go/go-pgx-cdc/pq/message/format"
 	"github.com/s3-go/go-pgx-cdc/pq/publication"
 	"github.com/s3-go/go-pgx-cdc/pq/replication"
@@ -25,6 +26,11 @@ func (l *listenersContainerReplica) ListenerFunc() replication.ListenerFunc {
 			l.messageCh <- msg
 		}
 		_ = ctx.Ack()
+	}
+}
+
+func (l *listenersContainerReplica) SendLSNHookFunc() replication.SendLSNHookFunc {
+	return func(pq.LSN) {
 	}
 }
 
